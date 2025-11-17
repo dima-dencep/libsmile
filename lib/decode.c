@@ -163,7 +163,76 @@ int smile_decode(s_stream *strm)
                 }
             } else if (BYTE() >= 0x28 && BYTE() <= 0x2B) {
                 // Floating point numbers
-                NOT_IMPLEMENTED("value fp");
+                #define REQUIRE_INPUT(n)                      \
+                do {                                          \
+                    if (have < (unsigned int)(n)) {           \
+                        strm->msg = (char *)"truncated fp";   \
+                        state->mode = BAD;                    \
+                        break;                                \
+                    }                                         \
+                } while (0)
+
+                char fp_buf[64];
+                int fp_len = 0;
+
+                if (BYTE() == 0x28) {
+                    union {
+                        uint32_t u;
+                        float f;
+                    } u32;
+
+                    REQUIRE_INPUT(4);
+                    u32.u = ((uint32_t)next[0] << 24) |
+                            ((uint32_t)next[1] << 16) |
+                            ((uint32_t)next[2] << 8)  |
+                            ((uint32_t)next[3]);
+                    next += 4;
+                    have -= 4;
+
+                    fp_len = snprintf(fp_buf, sizeof(fp_buf), "%.9g", (double)u32.f);
+                } else if (BYTE() == 0x29) {
+                    union {
+                        uint64_t u;
+                        double d;
+                    } u64;
+
+                    REQUIRE_INPUT(8);
+                    u64.u = ((uint64_t)next[0] << 56) |
+                            ((uint64_t)next[1] << 48) |
+                            ((uint64_t)next[2] << 40) |
+                            ((uint64_t)next[3] << 32) |
+                            ((uint64_t)next[4] << 24) |
+                            ((uint64_t)next[5] << 16) |
+                            ((uint64_t)next[6] << 8)  |
+                            ((uint64_t)next[7]);
+                    next += 8;
+                    have -= 8;
+
+                    fp_len = snprintf(fp_buf, sizeof(fp_buf), "%.17g", u64.d);
+                } else if (BYTE() == 0x2A) {
+                    NOT_IMPLEMENTED("value BigDecimal");
+                    break;
+                } else { /* 0x2B */
+                    RESERVED("value fp reserved");
+                    break;
+                }
+
+                if (fp_len < 0) {
+                    strm->msg = (char *)"fp snprintf failed";
+                    state->mode = BAD;
+                    break;
+                }
+
+                if ((unsigned int)fp_len > left) {
+                    strm->msg = (char *)"output buffer too small for fp";
+                    state->mode = BAD;
+                    break;
+                }
+
+                memcpy(put, fp_buf, (size_t)fp_len);
+                put  += fp_len;
+                left -= (unsigned int)fp_len;
+                #undef REQUIRE_INPUT
             } else if (BYTE() >= 0x2C && BYTE() <= 0x3F) {
                 // Reserved for future use
                 RESERVED("0x2C <= value <= 0x3F");
