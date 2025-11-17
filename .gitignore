@@ -50,8 +50,9 @@ php/Makefile.objects
 php/acinclude.m4
 php/build/
 php/config.nice
-php/configure.in
+php/configure.*
 php/mkinstalldirs
 php/run-tests.php
 php/Makefile
-php/php_libsmile.loT
+php/php_libsmile.*
+.DS_Store

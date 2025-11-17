@@ -23,12 +23,16 @@
 #include "ext/standard/info.h"
 #include "php_libsmile.h"
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_libsmile_decode, 0, 0, 1)
+    ZEND_ARG_INFO(0, data)
+ZEND_END_ARG_INFO()
+
 /* {{{ libsmile_functions[]
  *
  * Every user visible function must have an entry in libsmile_functions[].
  */
-zend_function_entry libsmile_functions[] = {
-    PHP_FE(libsmile_decode, NULL)
+static const zend_function_entry libsmile_functions[] = {
+    PHP_FE(libsmile_decode, arginfo_libsmile_decode)
     {NULL, NULL, NULL}    /* Must be the last line in libsmile_functions[] */
 };
 /* }}} */
@@ -93,13 +97,11 @@ PHP_FUNCTION(libsmile_decode)
     zval *zinput;
 
     char *input;
-    int len;
+    size_t len;
     char result[BUFFER_SIZE] = {'\0'};
 
-    int num_args = ZEND_NUM_ARGS();
-
-    if (num_args != 1 || !zend_parse_parameters(num_args TSRMLS_CC, "z", &zinput) == FAILURE) {
-        WRONG_PARAM_COUNT;
+    if (zend_parse_parameters(ZEND_NUM_ARGS(), "z", &zinput) == FAILURE) {
+        RETURN_FALSE;
     }
 
     if (Z_TYPE_P(zinput) != IS_STRING) {
@@ -112,6 +114,9 @@ PHP_FUNCTION(libsmile_decode)
     // Reset for successive calls
     smile_decode_block_reset();
 
-    smile_decode_block(result, BUFFER_SIZE, input, len);
-    RETVAL_STRINGL(result, strlen(result), 1);
+    if (smile_decode_block(result, BUFFER_SIZE, input, len) != 0) {
+        RETURN_FALSE;
+    }
+
+    RETVAL_STRINGL(result, strlen(result));
 }
